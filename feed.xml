@@ -6,8 +6,8 @@
 </description>
     <link>http://www.hardtoc.com/</link>
     <atom:link href="http://www.hardtoc.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Fri, 23 Feb 2018 09:04:05 +0100</pubDate>
-    <lastBuildDate>Fri, 23 Feb 2018 09:04:05 +0100</lastBuildDate>
+    <pubDate>Fri, 23 Feb 2018 12:24:31 +0100</pubDate>
+    <lastBuildDate>Fri, 23 Feb 2018 12:24:31 +0100</lastBuildDate>
     <generator>Jekyll v3.7.2</generator>
     
       <item>
@@ -260,7 +260,7 @@ site that might as well be static.&lt;/p&gt;
 &lt;a href=&quot;http://ethanschoonover.com/solarized&quot;&gt;Solarized&lt;/a&gt; light color theme,
 &lt;a href=&quot;https://github.com/adobe-fonts&quot;&gt;Source&lt;/a&gt; fonts, and a few icons from
 &lt;a href=&quot;https://fortawesome.github.io/Font-Awesome/&quot;&gt;Font Awesome&lt;/a&gt;. Source is
-&lt;a href=&quot;https://github.com/jibsen/hardtoc&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;a href=&quot;https://github.com/jibsen/hardtoc-src&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
 
 &lt;p&gt;One sad thing is that support for comments is gone. I could add something like
 Disqus, but quite frankly I don’t think it is worth it. You can always send me
