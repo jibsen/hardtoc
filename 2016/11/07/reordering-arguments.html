@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Reordering Arguments</title>
+  <meta name="description" content="When a C program runs, it usually receives any command-line arguments throughthe parameters argc (argument count) and argv (argument vector). It is upto the ...">
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Code+Pro|Source+Serif+Pro" type="text/css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="canonical" href="http://www.hardtoc.com/2016/11/07/reordering-arguments.html">
+  <link rel="alternate" type="application/rss+xml" title="Hard to C" href="http://www.hardtoc.com/feed.xml">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha384-crwIf/BuaWM9rM65iM+dWFldgQ1Un8jWZMuh3puxb8TOY9+linwLoI7ZHZT+aekW" crossorigin="anonymous"></script>
+
+</head>
+
+
+  <body>
+
+    <header class="site-header">
+
+  <div class="wrapper">
+
+    <a class="site-title" href="/">Hard to C</a>
+
+    <nav class="site-nav">
+      <a href="#" class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path fill="#424242" d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z"/>
+          <path fill="#424242" d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z"/>
+          <path fill="#424242" d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z"/>
+        </svg>
+      </a>
+
+      <div class="trigger">
+        
+          
+          <a class="page-link" href="/about/">About</a>
+          
+        
+          
+        
+          
+        
+          
+        
+      </div>
+    </nav>
+
+  </div>
+
+</header>
+
+
+    <div class="page-content">
+      <div class="wrapper">
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title" itemprop="name headline">Reordering Arguments</h1>
+    <p class="post-meta"><span class="post-meta-item"><i class="fa fa-calendar" aria-hidden="true"></i> <time datetime="2016-11-07T22:04:16+01:00" itemprop="datePublished">Nov 7, 2016</time></span><span class="post-meta-item"><i class="fa fa-user" aria-hidden="true"></i> <span itemprop="author" itemscope itemtype="http://schema.org/Person"><span itemprop="name">jibsen</span></span></span><span class="post-meta-item"><i class="fa fa-tags" aria-hidden="true"></i> <span itemprop="tags">C++ and Algorithm</span></span></p>
+  </header>
+
+  <div class="post-content" itemprop="articleBody">
+    <p>When a C program runs, it usually receives any command-line arguments through
+the parameters <code class="highlighter-rouge">argc</code> (argument count) and <code class="highlighter-rouge">argv</code> (argument vector). It is up
+to the program to interpret the contents of this array of strings.</p>
+
+<p>There are many ways to do this, one of the simpler solutions is the <a href="https://en.wikipedia.org/wiki/Getopt">getopt</a>
+function (in the following, getopt will refer to both getopt and getopt_long).
+One extension some getopt implementations offer, is that they reorder the
+contents of <code class="highlighter-rouge">argv</code> as they process it, resulting in an array where all the
+options appear first followed by the nonoptions.</p>
+
+<p>This reordering partitions the array. And we want a stable partition, so the
+relative order of all the options, and of all the nonoptions is the same.</p>
+
+<p>Last year I released <a href="https://github.com/jibsen/parg">parg</a>, a simple parser for <code class="highlighter-rouge">argv</code> that works similarly
+to getopt. It has a separate function, <code class="highlighter-rouge">parg_reorder()</code>, that performs this
+reordering. I used a simple algorithm for this – allocate a temporary array
+the size of <code class="highlighter-rouge">argv</code>, parse the arguments, and fill in the options from the start
+and nonoptions from the end of the new array. Then copy them back, reversing
+the nonoptions to their original order in the process. In hindsight, I could
+have moved the options into their final place in <code class="highlighter-rouge">argv</code> right away.</p>
+
+<p>This runs in <script type="math/tex">O(n)</script> time, but also requires <script type="math/tex">O(n)</script> additional space. The
+space requirement could be a problem (for instance on embedded systems), so
+let’s see if we can do better.</p>
+
+<p>The code examples in the following are pseudo-code, and glance over some
+details. Please see the <a href="https://github.com/jibsen/spart-example">examples on GitHub</a> for working C++ code.</p>
+
+<p>We note that if we already partitioned the two halves of an array,
+<script type="math/tex">L_{1}R_{1}L_{2}R_{2}</script>, we can compute the partition of both by swapping
+<script type="math/tex">R_{1}</script> and <script type="math/tex">L_{2}</script>. Swapping adjacent blocks in an array is sometimes
+called <em>rotating</em>, and can be done in linear time, for instance using reversal
+(observing that <script type="math/tex">LR = (R^{R}L^{R})^{R}</script>).</p>
+
+<div>
+ <svg class="center-svg" width="80%" viewBox="0 0 380 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+   <marker id="arrowhead" orient="auto" markerWidth="4" markerHeight="6" refX="1" refY="3">
+    <path d="M0,0 L0.5,3 L0,6 L4,3 z" />
+   </marker>
+  </defs>    
+  <g style="stroke-linecap:round;stroke-linejoin:round;stroke-width:1;stroke:black;fill:none;">
+   <title>Reordering by divide and conquer</title>
+   <path d="M10,20 v-5 h180 v5 v-5 h180 v5" />
+   <rect fill="#56b4e9" x="10" y="30" width="100" height="20" />
+   <rect fill="#d55e00" x="110" y="30" width="80" height="20" />
+   <rect fill="#56b4e9" x="190" y="30" width="120" height="20" />
+   <rect fill="#d55e00" x="310" y="30" width="60" height="20" />
+   <path d="M150,65 v-8" marker-end="url(#arrowhead)" />
+   <path d="M150,65 h100 v-8" marker-end="url(#arrowhead)" />
+  </g>
+ </svg>
+</div>
+
+<p>So we can use <a href="https://en.m.wikipedia.org/wiki/Divide_and_conquer_algorithms">divide and conquer</a>. With a recursive function that
+splits the array at the middle, this runs in <script type="math/tex">O(n \log n)</script> time and requires
+<script type="math/tex">O(\log n)</script> stack space.</p>
+
+<figure class="highlight"><pre><code class="language-cpp" data-lang="cpp"><span class="n">stable_partition_recursive</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pred</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="k">if</span> <span class="p">(</span><span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="n">pred</span><span class="p">(</span><span class="n">first</span><span class="p">)</span> <span class="o">?</span> <span class="n">first</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">:</span> <span class="n">first</span><span class="p">;</span>
+	<span class="p">}</span>
+
+	<span class="n">left</span>   <span class="o">=</span> <span class="n">stable_partition_recursive</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="n">n</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+	<span class="n">middle</span> <span class="o">=</span> <span class="n">first</span> <span class="o">+</span> <span class="n">n</span> <span class="o">/</span> <span class="mi">2</span><span class="p">;</span>
+	<span class="n">right</span>  <span class="o">=</span> <span class="n">stable_partition_recursive</span><span class="p">(</span><span class="n">middle</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="n">n</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+
+	<span class="n">rotate</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">right</span><span class="p">);</span>
+
+	<span class="k">return</span> <span class="n">left</span> <span class="o">+</span> <span class="p">(</span><span class="n">right</span> <span class="o">-</span> <span class="n">middle</span><span class="p">);</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>Much better, but ideally we would like to use only constant extra space.
+To achieve this, we can use the same technique as in bottom-up
+<a href="https://en.m.wikipedia.org/wiki/Merge_sort">merge sort</a>. We first process the array in blocks of size 2, then
+again in blocks of size 4 (whose two halves of size 2 are already
+partitioned), and so on, until we process the entire array as one block.</p>
+
+<figure class="highlight"><pre><code class="language-cpp" data-lang="cpp"><span class="n">stable_partition_bottomup</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pred</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="k">for</span> <span class="p">(</span><span class="n">width</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">width</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">;</span> <span class="n">width</span> <span class="o">*=</span> <span class="mi">2</span><span class="p">)</span> <span class="p">{</span>
+		<span class="n">next</span> <span class="o">=</span> <span class="n">first</span><span class="p">;</span>
+
+		<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">;</span> <span class="n">i</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">width</span><span class="p">)</span> <span class="p">{</span>
+			<span class="n">limit</span> <span class="o">=</span> <span class="n">n</span> <span class="o">-</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">width</span> <span class="o">?</span> <span class="n">n</span> <span class="o">-</span> <span class="n">i</span> <span class="o">:</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">width</span><span class="p">;</span>
+
+			<span class="k">if</span> <span class="p">(</span><span class="n">limit</span> <span class="o">&gt;</span> <span class="n">width</span><span class="p">)</span> <span class="p">{</span>
+				<span class="n">middle</span> <span class="o">=</span> <span class="n">next</span> <span class="o">+</span> <span class="n">width</span><span class="p">;</span>
+				<span class="n">left</span>   <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">find_if_not</span><span class="p">(</span><span class="n">next</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+				<span class="n">next</span>   <span class="o">=</span> <span class="n">middle</span> <span class="o">+</span> <span class="n">width</span>
+				<span class="n">right</span>  <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">find_if_not</span><span class="p">(</span><span class="n">middle</span><span class="p">,</span> <span class="n">next</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+
+				<span class="n">rotate</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">right</span><span class="p">);</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="k">return</span> <span class="n">left</span> <span class="o">+</span> <span class="p">(</span><span class="n">right</span> <span class="o">-</span> <span class="n">middle</span><span class="p">);</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>This runs in <script type="math/tex">O(n \log n)</script> time and uses constant extra space.</p>
+
+<p>In a sense, the price we pay to avoid the recursion is that we do not remember
+the partition points of the two halves, and need to find them again. This means
+we use the predicate <script type="math/tex">O(n \log n)</script> times instead of <script type="math/tex">O(n)</script>.</p>
+
+<p>However, since the two halves are already partitioned, we can use binary search
+to find the partition points. This reduces the number of predicate applications
+to <script type="math/tex">O(n)</script> (since <script type="math/tex">\sum_{k=1}^{\infty}\frac{n}{2^k}\log 2^k = 2n</script>), which
+means we have the same time complexities as the recursive algorithm, but using
+only constant extra space.</p>
+
+<figure class="highlight"><pre><code class="language-cpp" data-lang="cpp"><span class="n">stable_partition_bsearch</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pred</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="k">for</span> <span class="p">(</span><span class="n">width</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">width</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">;</span> <span class="n">width</span> <span class="o">*=</span> <span class="mi">2</span><span class="p">)</span> <span class="p">{</span>
+		<span class="n">next</span> <span class="o">=</span> <span class="n">first</span><span class="p">;</span>
+
+		<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">;</span> <span class="n">i</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">width</span><span class="p">)</span> <span class="p">{</span>
+			<span class="n">limit</span> <span class="o">=</span> <span class="n">n</span> <span class="o">-</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">width</span> <span class="o">?</span> <span class="n">n</span> <span class="o">-</span> <span class="n">i</span> <span class="o">:</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">width</span><span class="p">;</span>
+
+			<span class="k">if</span> <span class="p">(</span><span class="n">limit</span> <span class="o">&gt;</span> <span class="n">width</span><span class="p">)</span> <span class="p">{</span>
+				<span class="n">middle</span> <span class="o">=</span> <span class="n">next</span> <span class="o">+</span> <span class="n">width</span><span class="p">;</span>
+				<span class="n">left</span>   <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">partition_point</span><span class="p">(</span><span class="n">next</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+				<span class="n">next</span>   <span class="o">=</span> <span class="n">middle</span> <span class="o">+</span> <span class="n">width</span>
+				<span class="n">right</span>  <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">partition_point</span><span class="p">(</span><span class="n">middle</span><span class="p">,</span> <span class="n">next</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+
+				<span class="n">rotate</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">right</span><span class="p">);</span>
+			<span class="p">}</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="k">return</span> <span class="n">left</span> <span class="o">+</span> <span class="p">(</span><span class="n">right</span> <span class="o">-</span> <span class="n">middle</span><span class="p">);</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>If the array is almost partitioned, these algorithms still go through every
+step. We can do something similar to natural merge sort, and repeatedly
+look for the next place where a rotate is needed, stopping if we find none.
+We must be careful though, if we simply look for <script type="math/tex">RL</script> areas and rotate them,
+we get quadratic time on alternating patterns. Instead we can look for
+<script type="math/tex">L_{1}R_{1}L_{2}R_{2}</script> and rotate the middle two, just like above.</p>
+
+<figure class="highlight"><pre><code class="language-cpp" data-lang="cpp"><span class="n">stable_partition_natural</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">pred</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="k">do</span> <span class="p">{</span>
+		<span class="n">next</span> <span class="o">=</span> <span class="n">first</span><span class="p">;</span>
+		<span class="n">change</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+		<span class="k">do</span> <span class="p">{</span>
+			<span class="n">left</span>   <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">find_if_not</span><span class="p">(</span><span class="n">next</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+			<span class="n">middle</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">find_if</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+			<span class="n">right</span>  <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">find_if_not</span><span class="p">(</span><span class="n">middle</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+			<span class="n">next</span>   <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">find_if</span><span class="p">(</span><span class="n">right</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">pred</span><span class="p">);</span>
+
+			<span class="k">if</span> <span class="p">(</span><span class="n">left</span> <span class="o">!=</span> <span class="n">middle</span> <span class="o">&amp;&amp;</span> <span class="n">middle</span> <span class="o">!=</span> <span class="n">right</span><span class="p">)</span> <span class="p">{</span>
+				<span class="n">rotate</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">middle</span><span class="p">,</span> <span class="n">right</span><span class="p">);</span>
+				<span class="n">change</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+			<span class="p">}</span>
+		<span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">next</span> <span class="o">!=</span> <span class="n">last</span><span class="p">);</span>
+	<span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">change</span><span class="p">);</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>At best this runs in <script type="math/tex">O(n)</script>, while the worst-case complexity is the same as
+the bottom-up version. Since the widths are no longer fixed size, we have to
+perform a linear search for the partition points, so the number of predicate
+applications is back to <script type="math/tex">O(n \log n)</script>. Also, we have to use the predicate
+to find the middle and next starting point, so we may use more predicate
+applications than the bottom-up version.</p>
+
+<p>There is an algorithm that can perform stable partitioning in <script type="math/tex">O(n)</script> using
+constant extra space (<a href="http://www.diku.dk/~jyrki/Paper/KP1992bJ.pdf">PDF</a>), but it is somewhat more involved,
+and not practical given the constraints of the specific task.</p>
+
+<p>Let us return to the problem of reordering arguments. One issue here is that we
+cannot tell if any given element is an option, an option argument, or a
+nonoption, without parsing the entire array up to that point (i.e. we cannot
+assume random access).</p>
+
+<p>This is because any given element could be preceded by an option that uses it
+as its option argument (looking at the previous element is not enough, since
+that might be an option argument instead of an option). Or there could be a
+<code class="highlighter-rouge">--</code> somewhere, which means the remaining elements are nonoptions (unless that
+<code class="highlighter-rouge">--</code> is in fact the option argument of a preceding option).</p>
+
+<p>This makes the natural algorithm a good fit, since it applies the predicate
+linearly from left to right in each loop.</p>
+
+<p>So how does this all compare to getopt implementations? The two I checked
+perform the reordering in each call by scanning over any nonoptions from the
+current position, and then rotating them to the end of the array. This
+effectively builds the array of nonoptions at the end, while moving down the
+part that has not yet been processed.</p>
+
+<div>
+ <svg class="center-svg" width="80%" viewBox="0 0 380 80" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+   <marker id="arrowhead" orient="auto" markerWidth="4" markerHeight="6" refX="1" refY="3">
+    <path d="M0,0 L0.5,3 L0,6 L4,3 z" />
+   </marker>
+  </defs>    
+  <g style="stroke-linecap:round;stroke-linejoin:round;stroke-width:1;stroke:black;fill:none;">
+   <title>Reordering by moving to end</title>
+   <path d="M115,25 v-10 h240 v8" marker-end="url(#arrowhead)" />
+   <rect fill="#56b4e9" x="10" y="30" width="90" height="20" />
+   <rect fill="#d55e00" x="100" y="30" width="30" height="20" />
+   <rect fill="#f0e442" x="130" y="30" width="240" height="20" />
+   <path d="M255,55 v10 h-138" marker-end="url(#arrowhead)" />
+  </g>
+ </svg>
+</div>
+
+<p>This requires constant extra space, but takes worst-case <script type="math/tex">O(n^{2})</script> time.
+While this could theoretically be used in an algorithmic complexity attack,
+most systems limit the size of the command-line arguments in some way. As an
+example of the worst-case behavior, the following line runs <code class="highlighter-rouge">ls</code> with 200,000
+nonoptions (redirecting the error messages for missing file), and takes about
+0.3 seconds (Fedora 24 running in a VM):</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nb">time </span>ls <span class="sb">`</span>perl -e <span class="s2">"print 'a a ' x 100000"</span><span class="sb">`</span> 2&gt;/dev/null</code></pre></figure>
+
+<p>Whereas this line runs <code class="highlighter-rouge">ls</code> with the same number of arguments, but alternating
+nonoptions and options (the <code class="highlighter-rouge">-a</code> option enables showing files that start with
+a period, and has no effect in this case), and takes 11 seconds:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nb">time </span>ls <span class="sb">`</span>perl -e <span class="s2">"print 'a -a ' x 100000"</span><span class="sb">`</span> 2&gt;/dev/null</code></pre></figure>
+
+
+  </div>
+
+</article>
+
+      </div>
+    </div>
+
+    <footer class="site-footer">
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li>Hard to C</li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-2">
+        <ul class="social-media-list">
+          
+          <li>
+            <a href="https://github.com/jibsen"><span class="icon icon--github"><svg viewBox="0 0 16 16"><path fill="#828282" d="M7.999,0.431c-4.285,0-7.76,3.474-7.76,7.761 c0,3.428,2.223,6.337,5.307,7.363c0.388,0.071,0.53-0.168,0.53-0.374c0-0.184-0.007-0.672-0.01-1.32 c-2.159,0.469-2.614-1.04-2.614-1.04c-0.353-0.896-0.862-1.135-0.862-1.135c-0.705-0.481,0.053-0.472,0.053-0.472 c0.779,0.055,1.189,0.8,1.189,0.8c0.692,1.186,1.816,0.843,2.258,0.645c0.071-0.502,0.271-0.843,0.493-1.037 C4.86,11.425,3.049,10.76,3.049,7.786c0-0.847,0.302-1.54,0.799-2.082C3.768,5.507,3.501,4.718,3.924,3.65 c0,0,0.652-0.209,2.134,0.796C6.677,4.273,7.34,4.187,8,4.184c0.659,0.003,1.323,0.089,1.943,0.261 c1.482-1.004,2.132-0.796,2.132-0.796c0.423,1.068,0.157,1.857,0.077,2.054c0.497,0.542,0.798,1.235,0.798,2.082 c0,2.981-1.814,3.637-3.543,3.829c0.279,0.24,0.527,0.713,0.527,1.437c0,1.037-0.01,1.874-0.01,2.129 c0,0.208,0.14,0.449,0.534,0.373c3.081-1.028,5.302-3.935,5.302-7.362C15.76,3.906,12.285,0.431,7.999,0.431z"/></svg>
+</span><span class="username">jibsen</span></a>
+
+          </li>
+          
+
+          
+          <li>
+            <a href="https://twitter.com/twibsen"><span class="icon icon--twitter"><svg viewBox="0 0 16 16"><path fill="#828282" d="M15.969,3.058c-0.586,0.26-1.217,0.436-1.878,0.515c0.675-0.405,1.194-1.045,1.438-1.809c-0.632,0.375-1.332,0.647-2.076,0.793c-0.596-0.636-1.446-1.033-2.387-1.033c-1.806,0-3.27,1.464-3.27,3.27 c0,0.256,0.029,0.506,0.085,0.745C5.163,5.404,2.753,4.102,1.14,2.124C0.859,2.607,0.698,3.168,0.698,3.767 c0,1.134,0.577,2.135,1.455,2.722C1.616,6.472,1.112,6.325,0.671,6.08c0,0.014,0,0.027,0,0.041c0,1.584,1.127,2.906,2.623,3.206 C3.02,9.402,2.731,9.442,2.433,9.442c-0.211,0-0.416-0.021-0.615-0.059c0.416,1.299,1.624,2.245,3.055,2.271 c-1.119,0.877-2.529,1.4-4.061,1.4c-0.264,0-0.524-0.015-0.78-0.046c1.447,0.928,3.166,1.469,5.013,1.469 c6.015,0,9.304-4.983,9.304-9.304c0-0.142-0.003-0.283-0.009-0.423C14.976,4.29,15.531,3.714,15.969,3.058z"/></svg>
+</span><span class="username">twibsen</span></a>
+
+          </li>
+          
+        </ul>
+      </div>
+
+      <div class="footer-col footer-col-3">
+        <p>Look and you will C -- Learn and you will C++
+</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+
+
+  </body>
+
+</html>

@@ -1,0 +1,1243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Hard to C</title>
+    <description>Look and you will C -- Learn and you will C++
+</description>
+    <link>http://www.hardtoc.com/</link>
+    <atom:link href="http://www.hardtoc.com/feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Fri, 23 Feb 2018 09:04:05 +0100</pubDate>
+    <lastBuildDate>Fri, 23 Feb 2018 09:04:05 +0100</lastBuildDate>
+    <generator>Jekyll v3.7.2</generator>
+    
+      <item>
+        <title>Reordering Arguments</title>
+        <description>&lt;p&gt;When a C program runs, it usually receives any command-line arguments through
+the parameters &lt;code class=&quot;highlighter-rouge&quot;&gt;argc&lt;/code&gt; (argument count) and &lt;code class=&quot;highlighter-rouge&quot;&gt;argv&lt;/code&gt; (argument vector). It is up
+to the program to interpret the contents of this array of strings.&lt;/p&gt;
+
+&lt;p&gt;There are many ways to do this, one of the simpler solutions is the &lt;a href=&quot;https://en.wikipedia.org/wiki/Getopt&quot;&gt;getopt&lt;/a&gt;
+function (in the following, getopt will refer to both getopt and getopt_long).
+One extension some getopt implementations offer, is that they reorder the
+contents of &lt;code class=&quot;highlighter-rouge&quot;&gt;argv&lt;/code&gt; as they process it, resulting in an array where all the
+options appear first followed by the nonoptions.&lt;/p&gt;
+
+&lt;p&gt;This reordering partitions the array. And we want a stable partition, so the
+relative order of all the options, and of all the nonoptions is the same.&lt;/p&gt;
+
+&lt;p&gt;Last year I released &lt;a href=&quot;https://github.com/jibsen/parg&quot;&gt;parg&lt;/a&gt;, a simple parser for &lt;code class=&quot;highlighter-rouge&quot;&gt;argv&lt;/code&gt; that works similarly
+to getopt. It has a separate function, &lt;code class=&quot;highlighter-rouge&quot;&gt;parg_reorder()&lt;/code&gt;, that performs this
+reordering. I used a simple algorithm for this – allocate a temporary array
+the size of &lt;code class=&quot;highlighter-rouge&quot;&gt;argv&lt;/code&gt;, parse the arguments, and fill in the options from the start
+and nonoptions from the end of the new array. Then copy them back, reversing
+the nonoptions to their original order in the process. In hindsight, I could
+have moved the options into their final place in &lt;code class=&quot;highlighter-rouge&quot;&gt;argv&lt;/code&gt; right away.&lt;/p&gt;
+
+&lt;p&gt;This runs in &lt;script type=&quot;math/tex&quot;&gt;O(n)&lt;/script&gt; time, but also requires &lt;script type=&quot;math/tex&quot;&gt;O(n)&lt;/script&gt; additional space. The
+space requirement could be a problem (for instance on embedded systems), so
+let’s see if we can do better.&lt;/p&gt;
+
+&lt;p&gt;The code examples in the following are pseudo-code, and glance over some
+details. Please see the &lt;a href=&quot;https://github.com/jibsen/spart-example&quot;&gt;examples on GitHub&lt;/a&gt; for working C++ code.&lt;/p&gt;
+
+&lt;p&gt;We note that if we already partitioned the two halves of an array,
+&lt;script type=&quot;math/tex&quot;&gt;L_{1}R_{1}L_{2}R_{2}&lt;/script&gt;, we can compute the partition of both by swapping
+&lt;script type=&quot;math/tex&quot;&gt;R_{1}&lt;/script&gt; and &lt;script type=&quot;math/tex&quot;&gt;L_{2}&lt;/script&gt;. Swapping adjacent blocks in an array is sometimes
+called &lt;em&gt;rotating&lt;/em&gt;, and can be done in linear time, for instance using reversal
+(observing that &lt;script type=&quot;math/tex&quot;&gt;LR = (R^{R}L^{R})^{R}&lt;/script&gt;).&lt;/p&gt;
+
+&lt;div&gt;
+ &lt;svg class=&quot;center-svg&quot; width=&quot;80%&quot; viewBox=&quot;0 0 380 80&quot; version=&quot;1.1&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; xmlns:xlink=&quot;http://www.w3.org/1999/xlink&quot;&gt;
+  &lt;defs&gt;
+   &lt;marker id=&quot;arrowhead&quot; orient=&quot;auto&quot; markerWidth=&quot;4&quot; markerHeight=&quot;6&quot; refX=&quot;1&quot; refY=&quot;3&quot;&gt;
+    &lt;path d=&quot;M0,0 L0.5,3 L0,6 L4,3 z&quot; /&gt;
+   &lt;/marker&gt;
+  &lt;/defs&gt;    
+  &lt;g style=&quot;stroke-linecap:round;stroke-linejoin:round;stroke-width:1;stroke:black;fill:none;&quot;&gt;
+   &lt;title&gt;Reordering by divide and conquer&lt;/title&gt;
+   &lt;path d=&quot;M10,20 v-5 h180 v5 v-5 h180 v5&quot; /&gt;
+   &lt;rect fill=&quot;#56b4e9&quot; x=&quot;10&quot; y=&quot;30&quot; width=&quot;100&quot; height=&quot;20&quot; /&gt;
+   &lt;rect fill=&quot;#d55e00&quot; x=&quot;110&quot; y=&quot;30&quot; width=&quot;80&quot; height=&quot;20&quot; /&gt;
+   &lt;rect fill=&quot;#56b4e9&quot; x=&quot;190&quot; y=&quot;30&quot; width=&quot;120&quot; height=&quot;20&quot; /&gt;
+   &lt;rect fill=&quot;#d55e00&quot; x=&quot;310&quot; y=&quot;30&quot; width=&quot;60&quot; height=&quot;20&quot; /&gt;
+   &lt;path d=&quot;M150,65 v-8&quot; marker-end=&quot;url(#arrowhead)&quot; /&gt;
+   &lt;path d=&quot;M150,65 h100 v-8&quot; marker-end=&quot;url(#arrowhead)&quot; /&gt;
+  &lt;/g&gt;
+ &lt;/svg&gt;
+&lt;/div&gt;
+
+&lt;p&gt;So we can use &lt;a href=&quot;https://en.m.wikipedia.org/wiki/Divide_and_conquer_algorithms&quot;&gt;divide and conquer&lt;/a&gt;. With a recursive function that
+splits the array at the middle, this runs in &lt;script type=&quot;math/tex&quot;&gt;O(n \log n)&lt;/script&gt; time and requires
+&lt;script type=&quot;math/tex&quot;&gt;O(\log n)&lt;/script&gt; stack space.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;stable_partition_recursive&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+	&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+		&lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;first&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+	&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+	&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;stable_partition_recursive&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+	&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;first&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+	&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;stable_partition_recursive&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+	&lt;span class=&quot;n&quot;&gt;rotate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+	&lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;left&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Much better, but ideally we would like to use only constant extra space.
+To achieve this, we can use the same technique as in bottom-up
+&lt;a href=&quot;https://en.m.wikipedia.org/wiki/Merge_sort&quot;&gt;merge sort&lt;/a&gt;. We first process the array in blocks of size 2, then
+again in blocks of size 4 (whose two halves of size 2 are already
+partitioned), and so on, until we process the entire array as one block.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;stable_partition_bottomup&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+	&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+		&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+		&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+			&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+			&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;next&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;find_if_not&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;find_if_not&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+				&lt;span class=&quot;n&quot;&gt;rotate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+			&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+		&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+	&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+	&lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;left&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This runs in &lt;script type=&quot;math/tex&quot;&gt;O(n \log n)&lt;/script&gt; time and uses constant extra space.&lt;/p&gt;
+
+&lt;p&gt;In a sense, the price we pay to avoid the recursion is that we do not remember
+the partition points of the two halves, and need to find them again. This means
+we use the predicate &lt;script type=&quot;math/tex&quot;&gt;O(n \log n)&lt;/script&gt; times instead of &lt;script type=&quot;math/tex&quot;&gt;O(n)&lt;/script&gt;.&lt;/p&gt;
+
+&lt;p&gt;However, since the two halves are already partitioned, we can use binary search
+to find the partition points. This reduces the number of predicate applications
+to &lt;script type=&quot;math/tex&quot;&gt;O(n)&lt;/script&gt; (since &lt;script type=&quot;math/tex&quot;&gt;\sum_{k=1}^{\infty}\frac{n}{2^k}\log 2^k = 2n&lt;/script&gt;), which
+means we have the same time complexities as the recursive algorithm, but using
+only constant extra space.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;stable_partition_bsearch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+	&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+		&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+		&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+			&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+			&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;limit&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;next&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;partition_point&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;width&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;partition_point&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+				&lt;span class=&quot;n&quot;&gt;rotate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+			&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+		&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+	&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+	&lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;left&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;If the array is almost partitioned, these algorithms still go through every
+step. We can do something similar to natural merge sort, and repeatedly
+look for the next place where a rotate is needed, stopping if we find none.
+We must be careful though, if we simply look for &lt;script type=&quot;math/tex&quot;&gt;RL&lt;/script&gt; areas and rotate them,
+we get quadratic time on alternating patterns. Instead we can look for
+&lt;script type=&quot;math/tex&quot;&gt;L_{1}R_{1}L_{2}R_{2}&lt;/script&gt; and rotate the middle two, just like above.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;stable_partition_natural&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;last&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+	&lt;span class=&quot;k&quot;&gt;do&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+		&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;first&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+		&lt;span class=&quot;n&quot;&gt;change&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+		&lt;span class=&quot;k&quot;&gt;do&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+			&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;find_if_not&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;last&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+			&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;find_if&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;last&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+			&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;find_if_not&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;last&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+			&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;find_if&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;last&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;pred&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+			&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;rotate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;left&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;middle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;right&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+				&lt;span class=&quot;n&quot;&gt;change&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+			&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+		&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;next&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;last&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+	&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;change&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;At best this runs in &lt;script type=&quot;math/tex&quot;&gt;O(n)&lt;/script&gt;, while the worst-case complexity is the same as
+the bottom-up version. Since the widths are no longer fixed size, we have to
+perform a linear search for the partition points, so the number of predicate
+applications is back to &lt;script type=&quot;math/tex&quot;&gt;O(n \log n)&lt;/script&gt;. Also, we have to use the predicate
+to find the middle and next starting point, so we may use more predicate
+applications than the bottom-up version.&lt;/p&gt;
+
+&lt;p&gt;There is an algorithm that can perform stable partitioning in &lt;script type=&quot;math/tex&quot;&gt;O(n)&lt;/script&gt; using
+constant extra space (&lt;a href=&quot;http://www.diku.dk/~jyrki/Paper/KP1992bJ.pdf&quot;&gt;PDF&lt;/a&gt;), but it is somewhat more involved,
+and not practical given the constraints of the specific task.&lt;/p&gt;
+
+&lt;p&gt;Let us return to the problem of reordering arguments. One issue here is that we
+cannot tell if any given element is an option, an option argument, or a
+nonoption, without parsing the entire array up to that point (i.e. we cannot
+assume random access).&lt;/p&gt;
+
+&lt;p&gt;This is because any given element could be preceded by an option that uses it
+as its option argument (looking at the previous element is not enough, since
+that might be an option argument instead of an option). Or there could be a
+&lt;code class=&quot;highlighter-rouge&quot;&gt;--&lt;/code&gt; somewhere, which means the remaining elements are nonoptions (unless that
+&lt;code class=&quot;highlighter-rouge&quot;&gt;--&lt;/code&gt; is in fact the option argument of a preceding option).&lt;/p&gt;
+
+&lt;p&gt;This makes the natural algorithm a good fit, since it applies the predicate
+linearly from left to right in each loop.&lt;/p&gt;
+
+&lt;p&gt;So how does this all compare to getopt implementations? The two I checked
+perform the reordering in each call by scanning over any nonoptions from the
+current position, and then rotating them to the end of the array. This
+effectively builds the array of nonoptions at the end, while moving down the
+part that has not yet been processed.&lt;/p&gt;
+
+&lt;div&gt;
+ &lt;svg class=&quot;center-svg&quot; width=&quot;80%&quot; viewBox=&quot;0 0 380 80&quot; version=&quot;1.1&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; xmlns:xlink=&quot;http://www.w3.org/1999/xlink&quot;&gt;
+  &lt;defs&gt;
+   &lt;marker id=&quot;arrowhead&quot; orient=&quot;auto&quot; markerWidth=&quot;4&quot; markerHeight=&quot;6&quot; refX=&quot;1&quot; refY=&quot;3&quot;&gt;
+    &lt;path d=&quot;M0,0 L0.5,3 L0,6 L4,3 z&quot; /&gt;
+   &lt;/marker&gt;
+  &lt;/defs&gt;    
+  &lt;g style=&quot;stroke-linecap:round;stroke-linejoin:round;stroke-width:1;stroke:black;fill:none;&quot;&gt;
+   &lt;title&gt;Reordering by moving to end&lt;/title&gt;
+   &lt;path d=&quot;M115,25 v-10 h240 v8&quot; marker-end=&quot;url(#arrowhead)&quot; /&gt;
+   &lt;rect fill=&quot;#56b4e9&quot; x=&quot;10&quot; y=&quot;30&quot; width=&quot;90&quot; height=&quot;20&quot; /&gt;
+   &lt;rect fill=&quot;#d55e00&quot; x=&quot;100&quot; y=&quot;30&quot; width=&quot;30&quot; height=&quot;20&quot; /&gt;
+   &lt;rect fill=&quot;#f0e442&quot; x=&quot;130&quot; y=&quot;30&quot; width=&quot;240&quot; height=&quot;20&quot; /&gt;
+   &lt;path d=&quot;M255,55 v10 h-138&quot; marker-end=&quot;url(#arrowhead)&quot; /&gt;
+  &lt;/g&gt;
+ &lt;/svg&gt;
+&lt;/div&gt;
+
+&lt;p&gt;This requires constant extra space, but takes worst-case &lt;script type=&quot;math/tex&quot;&gt;O(n^{2})&lt;/script&gt; time.
+While this could theoretically be used in an algorithmic complexity attack,
+most systems limit the size of the command-line arguments in some way. As an
+example of the worst-case behavior, the following line runs &lt;code class=&quot;highlighter-rouge&quot;&gt;ls&lt;/code&gt; with 200,000
+nonoptions (redirecting the error messages for missing file), and takes about
+0.3 seconds (Fedora 24 running in a VM):&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nb&quot;&gt;time &lt;/span&gt;ls &lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt;perl -e &lt;span class=&quot;s2&quot;&gt;&quot;print 'a a ' x 100000&quot;&lt;/span&gt;&lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt; 2&amp;gt;/dev/null&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Whereas this line runs &lt;code class=&quot;highlighter-rouge&quot;&gt;ls&lt;/code&gt; with the same number of arguments, but alternating
+nonoptions and options (the &lt;code class=&quot;highlighter-rouge&quot;&gt;-a&lt;/code&gt; option enables showing files that start with
+a period, and has no effect in this case), and takes 11 seconds:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nb&quot;&gt;time &lt;/span&gt;ls &lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt;perl -e &lt;span class=&quot;s2&quot;&gt;&quot;print 'a -a ' x 100000&quot;&lt;/span&gt;&lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt; 2&amp;gt;/dev/null&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+</description>
+        <pubDate>Mon, 07 Nov 2016 22:04:16 +0100</pubDate>
+        <link>http://www.hardtoc.com/2016/11/07/reordering-arguments.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2016/11/07/reordering-arguments.html</guid>
+        
+        <category>C++</category>
+        
+        <category>Algorithm</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Moving to Jekyll</title>
+        <description>&lt;p&gt;I am moving this blog to &lt;a href=&quot;https://jekyllrb.com/&quot;&gt;Jekyll&lt;/a&gt;. While WordPress has
+worked quite well for the past seven years, I feel it is too much effort for a
+site that might as well be static.&lt;/p&gt;
+
+&lt;p&gt;This is pretty much the stock Jekyll generated site using the
+&lt;a href=&quot;http://ethanschoonover.com/solarized&quot;&gt;Solarized&lt;/a&gt; light color theme,
+&lt;a href=&quot;https://github.com/adobe-fonts&quot;&gt;Source&lt;/a&gt; fonts, and a few icons from
+&lt;a href=&quot;https://fortawesome.github.io/Font-Awesome/&quot;&gt;Font Awesome&lt;/a&gt;. Source is
+&lt;a href=&quot;https://github.com/jibsen/hardtoc&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;One sad thing is that support for comments is gone. I could add something like
+Disqus, but quite frankly I don’t think it is worth it. You can always send me
+an email, or find me in #donationcoder on freenode.&lt;/p&gt;
+</description>
+        <pubDate>Wed, 11 May 2016 11:56:16 +0200</pubDate>
+        <link>http://www.hardtoc.com/2016/05/11/moving-to-jekyll.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2016/05/11/moving-to-jekyll.html</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>Not Quite Monokai</title>
+        <description>&lt;p&gt;&lt;a href=&quot;http://macromates.com/&quot;&gt;TextMate&lt;/a&gt; is a popular text editor for OS X. Since the
+first release 10 years ago, a lot of people have contributed color themes, many
+of which have been ported to other editors.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://www.hardtoc.com/assets/realmonokai.png&quot; alt=&quot;Will the real Monokai please stand up?&quot; class=&quot;center-image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;If you are using a Windows or Linux text editor with such a conversion, you
+might be looking at something slightly different than what the designer
+intended.&lt;/p&gt;
+
+&lt;p&gt;This quote from the &lt;a href=&quot;https://en.wikipedia.org/wiki/RGB_color_model&quot;&gt;Wikipedia article on RGB&lt;/a&gt; sums up the problem:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;RGB is a device-dependent color model: different devices detect or reproduce
+a given RGB value differently, since the color elements (such as phosphors or
+dyes) and their response to the individual R, G, and B levels vary from
+manufacturer to manufacturer, or even in the same device over time. Thus an
+RGB value does not define the same color across devices without some kind of
+color management.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;So, an RGB color like &lt;code class=&quot;highlighter-rouge&quot;&gt;#272822&lt;/code&gt; does not necessarily look the same on all
+computers, at least not without &lt;a href=&quot;https://en.wikipedia.org/wiki/Color_management&quot;&gt;color management&lt;/a&gt;. When we combine a
+color model like RGB with a &lt;a href=&quot;https://en.wikipedia.org/wiki/Color_space&quot;&gt;color space&lt;/a&gt;, we get device
+independent colors, which can be used to produce consistent results on
+calibrated equipment.&lt;/p&gt;
+
+&lt;p&gt;A simple way to think of this is that an RGB color contains the relative level
+of the red component, but does not specify what &lt;em&gt;red&lt;/em&gt; means. An RGB color space
+describes what exactly red, green, blue, and white are.&lt;/p&gt;
+
+&lt;p&gt;The color spaces used on Windows and Mac OS computers more or less reflect the
+hardware each platform was using at the time. This had the advantage that
+existing media matched the default profiles.&lt;/p&gt;
+
+&lt;p&gt;HP and Microsoft created the &lt;a href=&quot;https://en.wikipedia.org/wiki/SRGB&quot;&gt;sRGB&lt;/a&gt; color space, which was later adopted as
+the default color space for the web, and used in many consumer products.&lt;/p&gt;
+
+&lt;p&gt;On the Apple side, Adobe created &lt;a href=&quot;https://developer.apple.com/library/mac/qa/qa1430/_index.html&quot;&gt;Apple RGB&lt;/a&gt; for use in their
+software. With Mac OS X, Apple introduced a number of profiles, and Generic RGB
+was the default assumed for untagged media up to OS X 10.7 Lion, 2011.&lt;/p&gt;
+
+&lt;p&gt;The color differences between sRGB and Generic RGB are relatively subtle, the
+biggest difference is &lt;a href=&quot;https://en.wikipedia.org/wiki/Gamma_correction&quot;&gt;gamma correction&lt;/a&gt;, which used a gamma value of
+1.8 on Apple computers, while Windows uses 2.2.&lt;/p&gt;
+
+&lt;p&gt;This means that colors from OS X Generic RGB will look darker on Windows, and
+colors from Windows sRGB will look light and washed out on OS X. This has long
+been a known issue, and today it is much less of a problem due to color
+management, browser support for images tagged with color profiles, and Apple
+changing the default gamma from &lt;a href=&quot;http://support.apple.com/kb/ht3712&quot;&gt;1.8 to 2.2&lt;/a&gt; in OS X 10.6 Snow
+Leopard, 2009.&lt;/p&gt;
+
+&lt;p&gt;So how does this all relate to TextMate themes?&lt;/p&gt;
+
+&lt;p&gt;TextMate was first released in 2004, and a number of popular color themes were
+developed for it on Mac OS X, with the Generic RGB default color profile and a
+gamma of 1.8.&lt;/p&gt;
+
+&lt;p&gt;These themes have since been ported to other editors on Windows and Linux (some
+even support the same color theme file format that TextMate uses).&lt;/p&gt;
+
+&lt;p&gt;The colors are stored as RGB hex codes, like &lt;code class=&quot;highlighter-rouge&quot;&gt;#272822&lt;/code&gt;, which means we will not
+necessarily get the same color on Windows as on Mac OS. If the RGB color values
+are used directly on Windows, the themes will look darker. In fact, even OS X
+after the gamma change may render the colors darker outside TextMate.&lt;/p&gt;
+
+&lt;p&gt;The same problem has also occurred the other way around, where for instance the
+&lt;a href=&quot;http://ethanschoonover.com/solarized&quot;&gt;Solarized&lt;/a&gt; palette was developed in sRGB, and using the RGB values directly
+in a TextMate theme would result in &lt;a href=&quot;https://github.com/deplorableword/textmate-solarized/issues/33&quot;&gt;lighter colors&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;As an example, let us look at the &lt;a href=&quot;http://www.monokai.nl/blog/2006/07/15/textmate-color-theme/&quot;&gt;Monokai&lt;/a&gt; color theme by Wimer Hazenberg.
+It was made in 2006 for TextMate, so we assume it was designed under the
+default Generic RGB profile, with a gamma of 1.8.&lt;/p&gt;
+
+&lt;p&gt;Monokai has been ported to many editors, including Atom, Notepad++, and Sublime
+Text. In these three editors (and presumably many others), the RGB values from
+the original TextMate theme are used directly, which means they all appear
+darker on Windows.&lt;/p&gt;
+
+&lt;p&gt;In 2013 TextMate &lt;a href=&quot;https://github.com/textmate/textmate/commit/d70ccc7c&quot;&gt;added a key&lt;/a&gt; to the theme files that allows choosing
+sRGB color space (&lt;a href=&quot;https://github.com/aziz/tmTheme-Editor/issues/15&quot;&gt;without it&lt;/a&gt;, colors should be treated as Generic
+RGB). This is great for new themes, but you cannot simply put a sRGB tag on old
+themes without converting the colors into sRGB.&lt;/p&gt;
+
+&lt;p&gt;Converting from one RGB color space to another involves removing the source
+gamma, doing a linear transformation, and applying the destination gamma. If
+you are interested in more details on color spaces and the math involved in
+converting between them, &lt;a href=&quot;http://www.brucelindbloom.com/&quot;&gt;Lindbloom&lt;/a&gt; and &lt;a href=&quot;http://www.babelcolor.com/download/A%20review%20of%20RGB%20color%20spaces.pdf&quot;&gt;Pascale&lt;/a&gt; (PDF) are both good
+resources.&lt;/p&gt;
+
+&lt;p&gt;I wrote a &lt;a href=&quot;https://github.com/jibsen/tmcolorconv&quot;&gt;Python script&lt;/a&gt; to convert the
+RGB values in a tmTheme file from Generic RGB to sRGB. Here is a screenshot
+comparing Monokai original and sRGB in Sublime Text 3 on Windows:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://www.hardtoc.com/assets/monokai_compare.png&quot; alt=&quot;Monokai original and sRGB&quot; class=&quot;center-image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;You may object that the screenshot on the Monokai blog matches the dark
+appearance of the theme on Windows, but this is because the image is a GIF file
+without embedded color profile, and thus suffers the same fate as the theme,
+when its RGB values are assumed to be sRGB by your browser.&lt;/p&gt;
+
+</description>
+        <pubDate>Wed, 03 Sep 2014 09:24:34 +0200</pubDate>
+        <link>http://www.hardtoc.com/2014/09/03/not-quite-monokai.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2014/09/03/not-quite-monokai.html</guid>
+        
+        <category>Monokai</category>
+        
+        <category>sRGB</category>
+        
+        <category>TextMate</category>
+        
+        <category>Themes</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Time Difference</title>
+        <description>&lt;p&gt;This post is based on a discussion about &lt;a href=&quot;http://www.donationcoder.com/forum/index.php?topic=33116.0&quot;&gt;Progress Bars of Life&lt;/a&gt;, where I was foolish enough to claim that printing a text string representing the difference between two times could not be that hard in C. It is not hard, but turned out not to be entirely trivial either.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://www.hardtoc.com/assets/stockvault-pocket-watch100366-300x225.jpg&quot; alt=&quot;Pocket Watch&quot; class=&quot;center-image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The problem we will consider is; given two &lt;a href=&quot;http://en.cppreference.com/w/c/chrono/tm&quot;&gt;&lt;code&gt;tm&lt;/code&gt; structs&lt;/a&gt;, compute the difference in time between them, in such a way that we can easily format a string that gives a textual representation of it. We want years, months, days, hours, minutes, seconds.&lt;/p&gt;
+
+&lt;p&gt;The first idea you might get is to use &lt;a href=&quot;http://en.cppreference.com/w/c/chrono/difftime&quot;&gt;&lt;code&gt;difftime()&lt;/code&gt;&lt;/a&gt; to get the difference in seconds between the two times, and then compute the quantities we want by simple arithmetic. So,&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;n&quot;&gt;start_time&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;mktime&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;end_time&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;mktime&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;end&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;difftime&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;end_time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;start_time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;years&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_YEAR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;months&lt;/span&gt;  &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_YEAR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_MONTH&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;days&lt;/span&gt;    &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_MONTH&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_DAY&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;hours&lt;/span&gt;   &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_DAY&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_HOUR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;minutes&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_HOUR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_MINUTE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;seconds&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_MINUTE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;You often see something like this in timing code – it works great for showing elapsed time in seconds, minutes, even hours. Do you see any problems with this approach?&lt;/p&gt;
+
+&lt;p&gt;How many seconds are there in a month? That depends on which month of course. And even worse, it also depends on which year, due to &lt;a href=&quot;http://en.wikipedia.org/wiki/Leap_year&quot;&gt;leap years&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;For instance, the difference between Jan 31st and Mar 1st is sometimes 29 days, sometimes 30 days, but always 1 month 1 day. The difference between Jul 2nd and Aug 1st is 30 days, but not a month.&lt;/p&gt;
+
+&lt;p&gt;So once the difference in time exceeds hours, we somehow need to use the additional information about where this period of time starts and ends, in order to get answers that make sense to humans. Luckily this information is already available in the &lt;code&gt;tm&lt;/code&gt; structs.&lt;/p&gt;
+
+&lt;p&gt;If we accept the convention that the time between the 1st of a month and the 1st of the following is a “month” regardless of how many days are between, then one approach is to use elementary school subtraction on the &lt;code&gt;tm&lt;/code&gt; structs. We subtract one field at a time, starting at the lowest, borrowing from the next one if required.&lt;/p&gt;
+
+&lt;p&gt;For instance, we get the difference in seconds by subtracting the &lt;code&gt;tm_sec&lt;/code&gt; fields. If the result is negative, we have to borrow a minute.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;cm&quot;&gt;/* Difference in the seconds */&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;seconds&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;end&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_sec&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_sec&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/* If negative, we have to borrow a minute */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;seconds&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;seconds&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;60&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;seconds&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;min_borrow&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;But how do we borrow a month? Since we already know the number of days in the end month (&lt;code&gt;end.tm_mday&lt;/code&gt;), and all months in between are full calendar months, we only need to figure out how many days are in the start month.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;cm&quot;&gt;/* Returns 1 if y is a leap year, 0 otherwise */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;leap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;400&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;100&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;?&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;md&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;28&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;31&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/* ... */&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/* Difference in the days of month */&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;end&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_mday&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_mday&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;day_borrow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/* If negative, we have to borrow a month */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;start_mon_days&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+        &lt;span class=&quot;cm&quot;&gt;/* Get number of days in start month */&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;start_mon_days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;md&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_mon&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+        &lt;span class=&quot;cm&quot;&gt;/* If february, correct for leap year */&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_mon&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;start_mon_days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;leap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1900&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tm_year&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+        &lt;span class=&quot;n&quot;&gt;days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;start_mon_days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;days&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;mon_borrow&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;So, if we borrow a month, then the difference in the days of the month is the number of days left in the start month, plus the number of days in the end month, minus any borrow from the calculation of hours of the day. This is the same as the total number of days in the start month plus the negative difference we already computed.&lt;/p&gt;
+
+&lt;p&gt;This method gives the desired results on examples like the ones given above – months are what we perceive as months on the calendar.&lt;/p&gt;
+
+&lt;p&gt;There is one more detail we may have to consider – how many hours are there in a day? Usually 24, but due to &lt;a href=&quot;http://en.wikipedia.org/wiki/Daylight_saving_time&quot;&gt;daylight saving time&lt;/a&gt; (summer time) it might be 23 or 25.&lt;/p&gt;
+
+&lt;p&gt;As an example, consider the difference between 01:45 and 03:15, which is 1 hour 30 minutes in most cases. But the night DST starts, it will be only 30 minutes (from 01:45 STD to 03:15 DST). Even worse, the night DST ends, it will first be 2 hours 30 minutes (from 01:45 DST to 03:15 STD), then 1 hour 30 minutes (from 01:45 STD to 03:15 STD) as the clock runs through the extra hour.&lt;/p&gt;
+
+&lt;p&gt;Much like the relationship between months and days, I think it makes sense to interpret the difference between the same time on consecutive dates as a “day”, no matter if it takes 23, 24, or 25 actual hours. Once the difference goes below 1 day however, it is more logical to use the actual difference in clock time.&lt;/p&gt;
+
+&lt;p&gt;So we would like the difference between 12:00 STD the day before DST starts, and 12:30 DST the day DST starts to be 1 day 30 minutes even though it only takes 23 hours 30 minutes. And we want the difference between 12:30 DST the day before DST ends, and 12:00 STD the day DST ends to be 24 hours 30 minutes but not a day.&lt;/p&gt;
+
+&lt;p&gt;Handling of DST is implementation defined in C, so to keep things simple, we
+can let &lt;a href=&quot;http://en.cppreference.com/w/c/chrono/mktime&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;mktime()&lt;/code&gt;&lt;/a&gt; handle this
+for us. We just have to adjust the hours of the day in case the difference is
+below one day.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;cm&quot;&gt;/* If difference is below one calendar day and there was a DST difference
+   we adjust hour difference to clock time */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;years&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;months&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;days&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;
+ &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;hours&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_DAY&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_HOUR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;oldhours&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;hours&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+        &lt;span class=&quot;n&quot;&gt;hours&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;secdiff&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;%&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_DAY&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SEC_IN_HOUR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+        &lt;span class=&quot;cm&quot;&gt;/* Handle the special case where DST increased hours past 24 */&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;oldhours&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;hours&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;11&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;hours&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;24&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;In many cases you can safely ignore these details, and I am sure there are
+better ways to handle it – but I hope this has given some indication of how
+it may not be quite as simple as it appears. The code I wrote while playing
+around with this problem is &lt;a href=&quot;https://bitbucket.org/jibsen/tmdiff&quot;&gt;available here&lt;/a&gt;.&lt;/p&gt;
+</description>
+        <pubDate>Sat, 29 Dec 2012 20:09:04 +0100</pubDate>
+        <link>http://www.hardtoc.com/2012/12/29/time-difference.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2012/12/29/time-difference.html</guid>
+        
+        <category>C</category>
+        
+        <category>Programming</category>
+        
+        <category>Time</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Move Semantics Podcast</title>
+        <description>&lt;p&gt;&lt;a href=&quot;http://paper.li/visualc/news/2011/05/14&quot;&gt;The Visual C++ Weekly&lt;/a&gt; had a link to a podcast with &lt;a href=&quot;http://aristeia.com/&quot;&gt;Scott
+Meyers&lt;/a&gt; from &lt;a href=&quot;http://accu.org/index.php/conferences/accu_conference_2011&quot;&gt;ACCU 2011&lt;/a&gt; which I thought was great: &lt;a href=&quot;http://skillsmatter.com/podcast/home/move-semanticsperfect-forwarding-and-rvalue-references&quot;&gt;link&lt;/a&gt;.&lt;/p&gt;
+
+</description>
+        <pubDate>Mon, 16 May 2011 11:07:47 +0200</pubDate>
+        <link>http://www.hardtoc.com/2011/05/16/move-semantics-podcast.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2011/05/16/move-semantics-podcast.html</guid>
+        
+        <category>C++</category>
+        
+        <category>Information</category>
+        
+        <category>Link</category>
+        
+        <category>The Standard</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Long Division, Part 3</title>
+        <description>&lt;p&gt;I ended &lt;a href=&quot;/2010/09/20/long-division-part-2.html&quot;&gt;part two&lt;/a&gt; of this series with an open question:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;And of course I can’t help but wonder if the &lt;a href=&quot;http://en.wikipedia.org/wiki/Common_Language_Runtime&quot;&gt;CLR&lt;/a&gt; is compiled with Visual
+C++, so doing arithmetic on 64-bit numbers in C# and other .NET languages
+ends up at the same runtime functions?&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;I don’t have a lot of experience in debugging the CLR myself, so I asked
+&lt;a href=&quot;http://kodehoved.dk/&quot;&gt;Brian Rasmussen&lt;/a&gt; if he might be interested in taking a look at it. He
+was kind enough to take the time to point me in the right direction.&lt;/p&gt;
+
+&lt;p&gt;A little digging showed that the CLR does in fact call some of these functions
+from the C runtime, but with a twist.&lt;/p&gt;
+
+&lt;p&gt;The C# function we looked at was this:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-csharp&quot; data-lang=&quot;csharp&quot;&gt;&lt;span class=&quot;na&quot;&gt;[MethodImpl(MethodImplOptions.NoInlining)]&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Int64&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;div64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Int64&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Int64&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;The &lt;a href=&quot;http://en.wikipedia.org/wiki/Just-in-time_compilation&quot;&gt;JIT compiler&lt;/a&gt; produced the following 32-bit code:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-asm&quot; data-lang=&quot;asm&quot;&gt;    push    ebp
+    mov     ebp,esp
+    push    dword ptr [ebp+14h]
+    push    dword ptr [ebp+10h]
+    push    dword ptr [ebp+0Ch]
+    push    dword ptr [ebp+8]
+    call    clr!JIT_LDiv
+    pop     ebp
+    ret     10h&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;We note the call to &lt;code class=&quot;highlighter-rouge&quot;&gt;JIT_LDiv&lt;/code&gt;, which is a helper function in clr.dll (the CLR
+runtime, formerly mscorwks.dll). Let’s have a look at it:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;INT64&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;JIT_LDiv&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;INT64&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;INT64&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Is32BitSigned&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;INT32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;ehKind&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;kDivideByZeroException&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;goto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ThrowExcep&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;INT32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UINT64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;UI64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mh&quot;&gt;0x8000000000000000&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;ehKind&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;kOverflowException&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;goto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ThrowExcep&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+        &lt;span class=&quot;c1&quot;&gt;// Check for -ive or +ive numbers in -2**31 to 2**31
+&lt;/span&gt;        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Is32BitSigned&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;INT32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;INT32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// For all other combinations fallback to int64 div.
+&lt;/span&gt;    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This excerpt is from the &lt;a href=&quot;http://en.wikipedia.org/wiki/Shared_Source_Common_Language_Infrastructure&quot;&gt;Shared Source CLI&lt;/a&gt;, but the same code is
+present in clr.dll from .NET Framework 4.0.&lt;/p&gt;
+
+&lt;p&gt;The division in the return statement at line 28 generates a call to &lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt;
+from the C runtime library.&lt;/p&gt;
+
+&lt;p&gt;Now, the twist is that this helper function, besides checking for division by
+zero and overflow, also optimizes division of two values that both fit in 32
+bits (the division with casts at line 24).&lt;/p&gt;
+
+&lt;p&gt;This is one of the optimizations I used in WCRT as well, so I was interested in
+seeing how the CLR code performed. I removed the exception handling along with
+associated checks and ended up with this function, which I tested using the
+timing application from part 2:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;__int64&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;JIT_LDiv&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;__int64&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__int64&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Is32BitSigned&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+        &lt;span class=&quot;c1&quot;&gt;// Check for -ive or +ive numbers in -2**31 to 2**31
+&lt;/span&gt;        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Is32BitSigned&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// For all other combinations fallback to __int64 div.
+&lt;/span&gt;    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dividend&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;divisor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Here is a summary of the results from my Athlon 64:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Function          WCRT        VC       Diff
+-------------------------------------------
+(CLR runtime function)
+HH JIT_LDiv       2125      4222     +49.7%
+HL JIT_LDiv       4104      5128     +20.0%
+LL JIT_LDiv       1312      1312      +0.0%
+
+(C runtime function)
+HH _alldiv        1709      3907     +56.2%
+HL _alldiv        3260      4309     +24.3%
+LL _alldiv        1204      2161     +44.2%
+
+HH = 64-bit op 64-bit
+HL = 64-bit op 32-bit
+LL = 32-bit op 32-bit
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;In the WCRT column, &lt;code class=&quot;highlighter-rouge&quot;&gt;JIT_LDiv&lt;/code&gt; is compiled with &lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt; from WCRT, and in the
+VC column with &lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt; from the VC CRT. So the first three rows compare the
+speed of the CLR helper function when using those as fallback.&lt;/p&gt;
+
+&lt;p&gt;We can see that there is a noticeable improvement on HH and HL, even though the
+check for two values that both fit in 32 bits is done twice (once in
+&lt;code class=&quot;highlighter-rouge&quot;&gt;JIT_LDiv&lt;/code&gt;, and once in the WCRT version of &lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt;).&lt;/p&gt;
+
+&lt;p&gt;The next three rows compare the C runtime function &lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt; from WCRT and the
+VC CRT. These results are the same as in part 2.&lt;/p&gt;
+
+&lt;p&gt;The special handling of two values that both fit in 32 bits is a big
+improvement. On LL, &lt;code class=&quot;highlighter-rouge&quot;&gt;JIT_LDiv&lt;/code&gt; is almost as fast as the WCRT version of
+&lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt;. For HL and HH, &lt;code class=&quot;highlighter-rouge&quot;&gt;JIT_LDiv&lt;/code&gt; is slightly slower than the regular VC
+&lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt; due to the extra checks.&lt;/p&gt;
+
+&lt;p&gt;So, in conclusion, the CLR runtime is compiled with Visual C++, and when code
+runs under 32-bit, the CLR runtime will fall back to the 64-bit arithmetic
+functions from the C runtime library.&lt;/p&gt;
+
+&lt;p&gt;The CLR runtime contains optimizations for certain values (usually when both
+operands fit in 32 bits), but for other cases optimizing the C runtime
+functions appears to provide a direct improvement for the CLR as well.&lt;/p&gt;
+
+</description>
+        <pubDate>Mon, 11 Oct 2010 14:49:41 +0200</pubDate>
+        <link>http://www.hardtoc.com/2010/10/11/long-division-part-3.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2010/10/11/long-division-part-3.html</guid>
+        
+        <category>C</category>
+        
+        <category>CLR</category>
+        
+        <category>Compiler</category>
+        
+        <category>Information</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Move to Parent</title>
+        <description>&lt;p&gt;This post is inspired by a discussion regarding a &lt;a href=&quot;http://www.donationcoder.com/Forums/bb/index.php?topic=24095.0&quot;&gt;coding snack&lt;/a&gt; done by
+lanux128 on &lt;a href=&quot;http://www.donationcoder.com/&quot;&gt;DonationCoder&lt;/a&gt;. A user requested a tool to add a context menu
+entry that would copy selected files and folders to the parent folder.&lt;/p&gt;
+
+&lt;p&gt;Moving folders is one of those tasks that appear trivial. But as always, the
+devil is in the details.&lt;/p&gt;
+
+&lt;p&gt;To &lt;a href=&quot;http://en.wikipedia.org/wiki/KISS_principle&quot;&gt;keep it simple&lt;/a&gt;, we will assume regular files and folders in a
+filesystem where paths are unique. The problem we will look at is: Given
+absolute paths Src and Dst (where Dst is not equal to, or a subfolder of Src),
+move the contents of Src to Dst.&lt;/p&gt;
+
+&lt;p&gt;The first solution that comes to mind is to move files and folders recursively.
+In pseudocode it would be something along the lines of:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;MoveSimple&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Loop through files/folders in Src folder
+&lt;/span&gt;    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;each&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;is&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;folder&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// Create folder in Dst
+&lt;/span&gt;            &lt;span class=&quot;n&quot;&gt;mkdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+
+            &lt;span class=&quot;c1&quot;&gt;// Recursively move contents of subfolder
+&lt;/span&gt;            &lt;span class=&quot;n&quot;&gt;MoveSimple&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+            &lt;span class=&quot;c1&quot;&gt;// Remove subfolder, which is now empty
+&lt;/span&gt;            &lt;span class=&quot;n&quot;&gt;rmdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// Move file to Dst
+&lt;/span&gt;            &lt;span class=&quot;n&quot;&gt;move&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This works – well, almost.&lt;/p&gt;
+
+&lt;p&gt;Consider the following folder structure (please forgive the tree output, it was
+an easy way to get a consistent representation):&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;\---parent
+    \---foo
+        |   log.txt  ; contains &quot;first&quot;
+        |
+        \---foo
+                log.txt  ; contains &quot;second&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;We are in \parent\foo and want to move the contents (the subfolder foo and the
+file log.txt) to \parent. The correct result would be:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;\---parent
+    |   log.txt  ; contains &quot;first&quot;
+    |
+    \---foo
+            log.txt  ; contains &quot;second&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The problem is that if we call MoveSimple(\parent\foo, \parent), and we process
+the subfolder foo first, then we will overwrite \parent\foo\log.txt before it
+gets moved out to \parent.&lt;/p&gt;
+
+&lt;p&gt;You might suggest that we handle files first, and then recurse on subfolders.
+But that won’t work either:&lt;/p&gt;
+
+&lt;pre&gt;
+\---parent
+    \---foo
+        +---foo
+        |   \---zeb
+        |           log.txt
+        |
+        \---zeb
+                log.txt
+&lt;/pre&gt;
+
+&lt;p&gt;If we recurse into foo before zeb, we will overwrite \parent\foo\zeb\log.txt
+before it gets moved out.&lt;/p&gt;
+
+&lt;p&gt;By now it should be clear that the culprit is the foo subfolder. With that, we
+end up writing to parts of the folder structure we are in the process of
+moving.&lt;/p&gt;
+
+&lt;p&gt;More generally, we may run into problems if any destination path touches the
+source tree.&lt;/p&gt;
+
+&lt;p&gt;The sledge hammer fix is to make sure there is no way we can overwrite anything
+in the source folder, by first moving it to someplace safe, and then to where
+we want it:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;MoveSafeButSlow&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;random&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;unique&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;folder&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Create temporary folder in Dst
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;mkdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Move contents of Src to Tmp
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;MoveSimple&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Remove Src which is now empty
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;rmdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Move contents of Tmp to Dst
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;MoveSimple&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Remove Tmp which is now empty
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;rmdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This works, but now we are moving every file and folder twice. Besides the
+performance impact, it would also make it hard to interrupt the operation and
+handle errors – the user could end up with files lost in a temporary
+directory.&lt;/p&gt;
+
+&lt;p&gt;Let’s go back to MoveSimple and try to figure out what exactly went wrong. It
+worked fine as long as we did not write to parts of the source tree that we had
+not moved yet.&lt;/p&gt;
+
+&lt;p&gt;The only way we can end up writing into the source tree, is if Src contains a
+special subfolder with a relative path that exactly matches the path from Dst
+to Src. Such a path would be unique.&lt;/p&gt;
+
+&lt;p&gt;Moving that special folder is only a problem if there is still something else
+left in Src that has not yet been moved. If we moved everything else, there is
+nothing it can overwrite.&lt;/p&gt;
+
+&lt;p&gt;So if we check if we run into such a special folder, and make sure we move
+everything else before it, it should work:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;n&quot;&gt;MoveSafeHelper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrgSrc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// Loop through files/folders in Src folder
+&lt;/span&gt;    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;each&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;is&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;folder&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// Check if we are about to overlap original Src
+&lt;/span&gt;            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrgSrc&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;c1&quot;&gt;// Remember Name, but skip for now
+&lt;/span&gt;                &lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;c1&quot;&gt;// Create folder in Dst
+&lt;/span&gt;                &lt;span class=&quot;n&quot;&gt;mkdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+
+                &lt;span class=&quot;c1&quot;&gt;// Recursively move contents of subfolder
+&lt;/span&gt;                &lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MoveSafeHelper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrgSrc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+                &lt;span class=&quot;c1&quot;&gt;// If we found a point of overlap inside Name,
+&lt;/span&gt;                &lt;span class=&quot;c1&quot;&gt;// set Special to the relative path to it
+&lt;/span&gt;                &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                    &lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Tmp&lt;/span&gt;
+                &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                    &lt;span class=&quot;c1&quot;&gt;// Otherwise remove subfolder which is now empty
+&lt;/span&gt;                    &lt;span class=&quot;n&quot;&gt;rmdir&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+                &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;c1&quot;&gt;// Move file to Dst
+&lt;/span&gt;            &lt;span class=&quot;n&quot;&gt;move&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Name&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;MoveSafe&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MoveSafeHelper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;c1&quot;&gt;// If the call returned a relative path to a folder that touches Src,
+&lt;/span&gt;    &lt;span class=&quot;c1&quot;&gt;// then we have moved everything else in Src now, and can safely
+&lt;/span&gt;    &lt;span class=&quot;c1&quot;&gt;// move that folder
+&lt;/span&gt;    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;MoveSafe&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Src&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dst&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Special&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;I wrote a simple Perl script that implements MoveSafe, and it works for all the
+test cases in this post, but of course standard disclaimers apply.&lt;/p&gt;
+
+&lt;p&gt;There are other ways to implement safely moving a folder, depending on what
+features you desire. For instance you can make it safe to move a folder to a
+child folder, which this function does not handle. The aim with this particular
+method was to get (roughly) the same speed as the simple recursive method.&lt;/p&gt;
+
+&lt;p&gt;At this point I started wondering if I was overcomplicating things – if this
+was in fact all rather trivial. So I set out to check how some &lt;a href=&quot;http://www.donationcoder.com/Forums/bb/index.php?topic=9958.0&quot;&gt;popular file
+managers&lt;/a&gt; would fare.&lt;/p&gt;
+
+&lt;p&gt;The five I tried were: &lt;a href=&quot;http://www.gpsoft.com.au/&quot;&gt;Directory Opus&lt;/a&gt; 9.5.5.0, &lt;a href=&quot;http://www.ghisler.com/&quot;&gt;Total Commander&lt;/a&gt;
+7.55a, &lt;a href=&quot;http://www.zabkat.com/&quot;&gt;xplorer²&lt;/a&gt; 1.8.0.13, &lt;a href=&quot;http://www.xyplorer.com/&quot;&gt;XYplorer&lt;/a&gt; 9.50, and &lt;a href=&quot;http://en.wikipedia.org/wiki/Windows_Explorer&quot;&gt;Windows
+Explorer&lt;/a&gt; (WinXP SP3).&lt;/p&gt;
+
+&lt;p&gt;I made two test cases, which are similar to the examples above, but contain a
+few more files to make sure sorting order does not help any application get it
+right by chance.&lt;/p&gt;
+
+&lt;p&gt;I used a script to generate the test cases to make sure they were identical,
+and used any internal move command where possible. I answered yes to any
+dialogs that asked if I wanted to overwrite anything.&lt;/p&gt;
+
+&lt;p&gt;The first test case is this (as usual we are in \parent\foo and want to move
+the contents to \parent):&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;\---parent
+    \---foo
+        |   a.txt ; &quot;first&quot;
+        |   z.txt ; &quot;first&quot;
+        |
+        \---foo
+            |   a.txt ; &quot;second&quot;
+            |   z.txt ; &quot;second&quot;
+            |
+            \---foo
+                    a.txt ; &quot;third&quot;
+                    z.txt ; &quot;third&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;And the second test case is:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;\---parent
+    \---foo
+        +---ccc
+        |       a.txt
+        |       x.txt
+        |
+        +---foo
+        |   +---ccc
+        |   |       b.txt
+        |   |       y.txt
+        |   |
+        |   \---zzz
+        |           b.txt
+        |           y.txt
+        |
+        \---zzz
+                a.txt
+                x.txt
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;None of the five file managers tested handled these two test correctly. I
+realize this special condition is not very common, but I still found it
+interesting that none of them, not even Windows Explorer, appear to be able to
+move any folder to a parent folder.&lt;/p&gt;
+
+</description>
+        <pubDate>Sat, 02 Oct 2010 00:04:56 +0200</pubDate>
+        <link>http://www.hardtoc.com/2010/10/02/move-to-parent.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2010/10/02/move-to-parent.html</guid>
+        
+        <category>Information</category>
+        
+        <category>Programming</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Quoting Command-line Arguments</title>
+        <description>&lt;p&gt;Raymond Chen recently &lt;a href=&quot;http://blogs.msdn.com/b/oldnewthing/archive/2010/09/17/10063629.aspx&quot;&gt;blogged&lt;/a&gt; about the way CommandLineToArgvW treats
+quotes and backslashes. Parsing the command-line into &lt;code class=&quot;highlighter-rouge&quot;&gt;argv[]&lt;/code&gt; is something I
+have had to fight with as well, so besides pointing to Raymond’s excellent
+post, I wanted to add a few comments of my own here.&lt;/p&gt;
+
+&lt;p&gt;We are examining how command-line arguments with spaces and quotes are handled.
+Part of the problem comes from the fact that &lt;a href=&quot;http://en.wikipedia.org/wiki/Path_%28computing%29&quot;&gt;DOS/Windows uses backslash as
+separator in paths&lt;/a&gt;. On systems like Unix, where forward slash is used
+instead, using backslash to escape special characters is less of a problem. But
+if you ever put a &lt;a href=&quot;http://msdn.microsoft.com/en-us/library/aa365247.aspx&quot;&gt;Windows path&lt;/a&gt; in a C string literal, you may have
+run into &lt;a href=&quot;http://en.wikipedia.org/wiki/Leaning_toothpick_syndrome&quot;&gt;LTS&lt;/a&gt; – the situation where a string becomes unreadable due to
+escape characters.&lt;/p&gt;
+
+&lt;p&gt;Microsoft fixed this in C# with &lt;a href=&quot;http://msdn.microsoft.com/en-us/library/362314fe.aspx&quot;&gt;verbatim string literals&lt;/a&gt;. C# also
+implements a simpler method of escaping a quote inside a quoted string –
+doubling it – which is used in languages like Pascal and BASIC, and is what
+Raymond’s second hypothetical set of rules suggest.&lt;/p&gt;
+
+&lt;p&gt;The compromise we get for parsing command-line arguments in the C runtime
+library (and &lt;a href=&quot;http://msdn.microsoft.com/en-us/library/bb776391.aspx&quot;&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;CommandLineToArgvW()&lt;/code&gt;&lt;/a&gt;) is &lt;a href=&quot;http://msdn.microsoft.com/en-us/library/a1y7w461.aspx&quot;&gt;documented on MSDN&lt;/a&gt;.
+What the MSDN documentation does not tell you is that there is a second
+mechanism for inserting a literal quote in a quoted string – or at least there
+might be, depending on which version of the C runtime library.&lt;/p&gt;
+
+&lt;p&gt;In Visual C++ 2.0 from 1994, the command-line parser handles two quotes inside
+a quoted string as an escape. What it does is that it copies the second quote
+and switches to unquoted mode. Thus you can insert a literal quote inside a
+quoted string by putting three quotes (two to insert the literal quote, and one
+more to put you back into quoted mode).&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;p&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DQUOTECHAR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;inquote&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DQUOTECHAR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;    &lt;span class=&quot;cm&quot;&gt;/* Double quote inside quoted string */&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt;        &lt;span class=&quot;cm&quot;&gt;/* skip first quote char and copy second */&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;copychar&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;copychar&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;       &lt;span class=&quot;cm&quot;&gt;/* don't copy quote */&lt;/span&gt;
+
+    &lt;span class=&quot;n&quot;&gt;inquote&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;inquote&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This code is present until Visual C++ 8.0 from 2005, where it is changed so the
+two quote escape sequence no longer switches mode. That means that to insert a
+literal quote inside a quoted string, you now only need two quotes.&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-c&quot; data-lang=&quot;c&quot;&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;p&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DQUOTECHAR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;inquote&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DQUOTECHAR&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;    &lt;span class=&quot;cm&quot;&gt;/* Double quote inside quoted string */&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;    &lt;span class=&quot;cm&quot;&gt;/* skip first quote char and copy second */&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;copychar&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;       &lt;span class=&quot;cm&quot;&gt;/* don't copy quote */&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;inquote&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;inquote&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+	&lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This change is probably what is causing some confusion in the comments on
+Raymond’s post – the twelve literal quotes in &lt;code class=&quot;highlighter-rouge&quot;&gt;foo&quot;&quot;&quot;&quot;&quot;&quot;&quot;&quot;&quot;&quot;&quot;&quot;bar&lt;/code&gt; will result
+in five quotes with the current parser (opening quote, five pairs, closing
+quote), but only four with the older method (opening quote, three triples, and
+a double quote).&lt;/p&gt;
+
+&lt;p&gt;The implementation of &lt;code class=&quot;highlighter-rouge&quot;&gt;CommandLineToArgvW()&lt;/code&gt; in current versions of shell32.dll
+use the older method. The same goes for the command-line parser used in GCC on
+Windows (I checked 4.5.1).&lt;/p&gt;
+
+&lt;p&gt;Looking at the two code excerpts, one could wonder if the old handling was in
+fact just a bug introduced by the else part not being in braces, and left in
+for over ten years. Or maybe it was intentional, and the change in Visual C++
+8.0 was to support the way two quotes are used as escape in other languages.&lt;/p&gt;
+
+&lt;p&gt;Either way, I find it interesting that this functionality was added (it wasn’t
+supported in Visual C++ 1.52), and then changed in the C runtime library but
+not in the API function, and not mentioned in the documentation of either.&lt;/p&gt;
+
+</description>
+        <pubDate>Fri, 24 Sep 2010 16:22:26 +0200</pubDate>
+        <link>http://www.hardtoc.com/2010/09/24/quoting-command-line-arguments.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2010/09/24/quoting-command-line-arguments.html</guid>
+        
+        <category>C</category>
+        
+        <category>Information</category>
+        
+        <category>Link</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Long Division, Part 2</title>
+        <description>&lt;p&gt;In &lt;a href=&quot;/2010/09/08/long-division.html&quot;&gt;part one&lt;/a&gt; I talked about the support functions in the C standard
+libraries of various x86 32-bit compilers that perform arithmetic operations
+when you use 64-bit integers in your code.&lt;/p&gt;
+
+&lt;p&gt;While updating &lt;a href=&quot;http://www.ibsensoftware.com/download.html&quot;&gt;WCRT&lt;/a&gt; to work with the latest Visual C++ compilers, I was
+writing my own implementations of these functions, and naturally I tested them
+against the versions supplied in the VC CRT to verify they worked.&lt;/p&gt;
+
+&lt;p&gt;To my surprise, I found the GCD test I wrote for &lt;a href=&quot;/2010/09/08/long-division.html&quot;&gt;Long Division&lt;/a&gt; ran
+faster when compiled with WCRT.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;C:\gcdtest&amp;gt;gcdtest_gcc-4.5.1.exe
+32-bit GCD: 314
+64-bit GCD: 851
+
+C:\gcdtest&amp;gt;gcdtest_vc2010.exe
+32-bit GCD: 300
+64-bit GCD: 835
+
+C:\gcdtest&amp;gt;gcdtest_vc2010-wcrt.exe
+32-bit GCD: 300
+64-bit GCD: 656
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;This naturally piqued my curiosity.&lt;/p&gt;
+
+&lt;p&gt;It turns out that the 64-bit arithmetic functions in VC have remained unchanged
+since Visual C++ 4.2 from 1996. The compiler and optimizer have evolved over
+the years, adapting to new processors, and improving the speed of your code.
+But if you happen to divide two 64-bit integers you are relying on code that is
+14 years old.&lt;/p&gt;
+
+&lt;p&gt;This was of course more than enough incentive to spend a little time trying to
+improve my implementations to see if I could beat the VC CRT.&lt;/p&gt;
+
+&lt;p&gt;Here are parts of the result from running &lt;a href=&quot;http://www.hardtoc.com/assets/comptime.zip&quot;&gt;this test&lt;/a&gt; on an Athlon 64:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Function          WCRT        VC       Diff
+-------------------------------------------
+HH _alldiv        1709      3907     +56.2%
+HL _alldiv        3260      4309     +24.3%
+LL _alldiv        1204      2161     +44.2%
+...
+HH _allmul         293       337     +13.0%
+HL _allmul         631       739     +14.6%
+LL _allmul         279       291      +4.1%
+...
+&amp;lt;32 _allshl        657       745     +11.8%
+&amp;lt;64 _allshl        568       566      -0.3%
+&amp;lt;96 _allshl        654       537     -21.7%
+...
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;As you can see, the difference ranges from a few percent to over 50% in the
+most favorable test.&lt;/p&gt;
+
+&lt;p&gt;The only operations that are slower in general are shifts of more than 64 bits.
+The shift functions do not contain a lot of code to work with in the first
+place, but I did choose to sacrifice some speed in shifts above 64 bits to get
+a small improvement in shifts below 32 bits, because they seem more likely to
+occur in actual code.&lt;/p&gt;
+
+&lt;p&gt;Now of course these improvements do come with some reservations. For one, the
+CRT functions have to perform well across all processors from 386 up to the
+cutting edge, while I only wrote mine with Intel Core and AMD Athlon in mind.
+Also, the test functions I use do not necessarily reflect the average use, so
+while some of the optimizations I did were favorable to the tests used, they
+may not be for other cases.&lt;/p&gt;
+
+&lt;p&gt;That being said, I think this does show that it is possible to get a
+non-trivial improvement by optimizing these functions. And if critical parts of
+your code deal with 64-bit numbers it is certainly worth investigating
+alternatives.&lt;/p&gt;
+
+&lt;p&gt;And of course I can’t help but wonder if the &lt;a href=&quot;http://en.wikipedia.org/wiki/Common_Language_Runtime&quot;&gt;CLR&lt;/a&gt; is compiled with Visual
+C++, so doing arithmetic on 64-bit numbers in C# and other .NET languages ends
+up at the same runtime functions?&lt;/p&gt;
+
+</description>
+        <pubDate>Mon, 20 Sep 2010 09:24:06 +0200</pubDate>
+        <link>http://www.hardtoc.com/2010/09/20/long-division-part-2.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2010/09/20/long-division-part-2.html</guid>
+        
+        <category>C</category>
+        
+        <category>Compiler</category>
+        
+        <category>Information</category>
+        
+        
+      </item>
+    
+      <item>
+        <title>Long Division</title>
+        <description>&lt;p&gt;Integer types with at least 64 bits have been a part of the C standard for a
+while now (they were added in C99, and were a standard extension in many 32-bit
+compilers before that). But have you ever wondered what exactly happens when
+you use them?&lt;/p&gt;
+
+&lt;p&gt;Consider the following function (substitute &lt;code class=&quot;highlighter-rouge&quot;&gt;long long&lt;/code&gt; with &lt;code class=&quot;highlighter-rouge&quot;&gt;__int64&lt;/code&gt; if you
+are using an older version of Visual C++):&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-cpp&quot; data-lang=&quot;cpp&quot;&gt;&lt;span class=&quot;kt&quot;&gt;long&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;long&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;div64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;long&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;long&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;long&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;long&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;/&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;let’s first have a look at what the VC 64-bit compiler gives us:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-asm&quot; data-lang=&quot;asm&quot;&gt;div64:
+    mov   r8, rdx
+    mov   rax, rcx
+    cdq
+    idiv  r8
+    ret&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Pretty much what you would expect, a little setup and an &lt;code class=&quot;highlighter-rouge&quot;&gt;idiv&lt;/code&gt; instruction to
+perform the division. Now let’s try the VC 32-bit compiler:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-asm&quot; data-lang=&quot;asm&quot;&gt;div64:
+_x$ = 8
+_y$ = 16
+    mov   eax, _y$[esp]
+    mov   ecx, _y$[esp-4]
+    mov   edx, _x$[esp]
+    push  eax
+    mov   eax, _x$[esp]
+    push  ecx
+    push  edx
+    push  eax
+    call  __alldiv
+    ret&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;A little setup and .. a call?&lt;/p&gt;
+
+&lt;p&gt;The thing is, 32-bit x86 only has instructions for mixed mode 32/64 bit
+operations – with one assembly instruction you can multiply two 32-bit
+integers to get a 64-bit result, or you can divide a 64-bit integer by a 32-bit
+as long as the quotient fits in 32 bits. But to divide two 64-bit integers, you
+have to emulate the operation in software.&lt;/p&gt;
+
+&lt;p&gt;That is where the &lt;code class=&quot;highlighter-rouge&quot;&gt;_alldiv&lt;/code&gt; function comes in. It is a support function in the
+C runtime library that performs a 64-bit divide. In fact there is a whole
+family of such functions to do multiply, divide and shifts on 64-bit numbers
+(addition and subtraction are inlined since they only require two assembly
+instructions).&lt;/p&gt;
+
+&lt;p&gt;Other compilers do likewise, for instance GCC calls &lt;code class=&quot;highlighter-rouge&quot;&gt;__divdi3&lt;/code&gt; to perform
+64-bit division.&lt;/p&gt;
+
+&lt;p&gt;It is important to be aware of this, because using &lt;code class=&quot;highlighter-rouge&quot;&gt;long long&lt;/code&gt; instead of &lt;code class=&quot;highlighter-rouge&quot;&gt;int&lt;/code&gt;
+means that arithmetic operations you probably expect to be single instructions,
+all of a sudden become library calls who’s execution time can depend on the
+arguments.&lt;/p&gt;
+
+&lt;p&gt;As an example, I timed a &lt;a href=&quot;http://www.hardtoc.com/assets/gcdtest.zip&quot;&gt;simple implementation&lt;/a&gt; of the &lt;a href=&quot;http://en.wikipedia.org/wiki/Extended_Euclidean_algorithm&quot;&gt;extended
+Euclidean algorithm&lt;/a&gt; with 32- and 64-bit integers. Compiling with the VC
+32-bit compiler, the 64-bit version was roughly 3 times slower (depending on
+the CPU).&lt;/p&gt;
+
+</description>
+        <pubDate>Wed, 08 Sep 2010 08:35:41 +0200</pubDate>
+        <link>http://www.hardtoc.com/2010/09/08/long-division.html</link>
+        <guid isPermaLink="true">http://www.hardtoc.com/2010/09/08/long-division.html</guid>
+        
+        <category>C</category>
+        
+        <category>Compiler</category>
+        
+        <category>Programming</category>
+        
+        
+      </item>
+    
+  </channel>
+</rss>
